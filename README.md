@@ -24,8 +24,8 @@ The design was verified using a self-checking Verilog testbench acting as the AP
 
 Below is the GTKWave simulation demonstrating a successful APB write transaction followed by the UART serial transmission. The Master writes the Baud Rate Divisor to `0x0C`, and then writes the ASCII character 'A' (`0x41`) to the TX Data Register at `0x00`.
 
-![UART Simulation Waveform](apb_uart_simulation.png)
-*Simulation showing APB Master write phases (SETUP and ACCESS) and the subsequent serial bit shifting.*
+![Bidirectional UART Simulation](apb_uart_full_sim.png)
+*Simulation showing APB Master writing 0x41 to TX, the external serial line injecting 0x5A into RX, and the CPU successfully reading the received byte.*
 
 ## Tools Used
 * **Design & RTL:** Verilog HDL, Visual Studio Code

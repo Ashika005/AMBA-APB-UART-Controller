@@ -4,11 +4,9 @@ module apb_uart_slave #(
     parameter ADDR_WIDTH = 8,
     parameter DATA_WIDTH = 32
 )(
-    // Global Signals
     input  wire                   pclk,
     input  wire                   presetn,
 
-    // APB Interface Signals
     input  wire [ADDR_WIDTH-1:0]  paddr,
     input  wire                   psel,
     input  wire                   penable,
@@ -17,61 +15,74 @@ module apb_uart_slave #(
     output reg                    pready,
     output reg  [DATA_WIDTH-1:0]  prdata,
 
-    // Internal Peripheral Control Signals
     output reg  [7:0]             tx_byte,
     output reg                    tx_start,
     input  wire                   tx_busy,
-    output reg  [15:0]            baud_div
+    output reg  [15:0]            baud_div,
+    
+    // New RX interface signals
+    input  wire [7:0]             rx_data,
+    input  wire                   rx_done
 );
 
-    // Address Definitions
     localparam ADDR_TXDATA  = 8'h00;
     localparam ADDR_RXDATA  = 8'h04;
     localparam ADDR_STATUS  = 8'h08;
     localparam ADDR_BAUDDIV = 8'h0C;
 
-    // APB Protocol Condition: Transfer is active in ACCESS phase
     wire apb_write_enable = psel && penable && pwrite;
     wire apb_read_enable  = psel && penable && !pwrite;
 
-    // 1. Ready signal generation
-    // For this design, all register accesses complete in 1 cycle without wait states
+    reg [7:0] rx_buffer;
+    reg       rx_valid;
+
     always @(*) begin
         pready = psel && penable;
     end
 
-    // 2. APB Write Logic (Registers & Pulse generation)
     always @(posedge pclk or negedge presetn) begin
         if (!presetn) begin
             tx_byte   <= 8'h00;
             tx_start  <= 1'b0;
-            baud_div  <= 16'd54; // Default to standard divisor
+            baud_div  <= 16'd54;
+            rx_buffer <= 8'h00;
+            rx_valid  <= 1'b0;
         end else begin
-            // tx_start must be a 1-cycle strobe
             tx_start <= 1'b0;
 
+            // Capture incoming data from RX core
+            if (rx_done) begin
+                rx_buffer <= rx_data;
+                rx_valid  <= 1'b1; // Set flag indicating unread data is present
+            end
+
+            // Clear the valid flag automatically when the CPU reads the RX register
+            if (apb_read_enable && paddr == ADDR_RXDATA) begin
+                rx_valid <= 1'b0;
+            end
+
+            // APB Write logic
             if (apb_write_enable) begin
                 case (paddr)
                     ADDR_TXDATA: begin
                         tx_byte  <= pwdata[7:0];
-                        tx_start <= 1'b1; // Trigger transmission
+                        tx_start <= 1'b1;
                     end
-                    ADDR_BAUDDIV: begin
-                        baud_div <= pwdata[15:0];
-                    end
-                    default: ; // Ignore undefined addresses
+                    ADDR_BAUDDIV: baud_div <= pwdata[15:0];
+                    default: ;
                 endcase
             end
         end
     end
 
-    // 3. APB Read Logic (Combinational)
+    // APB Read Logic
     always @(*) begin
         prdata = 32'h0;
         if (apb_read_enable) begin
             case (paddr)
-                ADDR_STATUS:  prdata = {31'b0, tx_busy};
-                ADDR_BAUDDIV: prdata = {16'b0, baud_div};
+                ADDR_RXDATA:  prdata = {24'h0, rx_buffer};
+                ADDR_STATUS:  prdata = {30'b0, rx_valid, tx_busy}; // bit 1: rx_valid, bit 0: tx_busy
+                ADDR_BAUDDIV: prdata = {16'h0, baud_div};
                 default:      prdata = 32'h0;
             endcase
         end

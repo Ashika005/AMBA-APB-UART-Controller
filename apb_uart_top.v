@@ -10,16 +10,20 @@ module apb_uart_top (
     input  wire [31:0] pwdata,
     output wire        pready,
     output wire [31:0] prdata,
-    output wire        tx_serial
+    
+    // External Serial Pins
+    output wire        tx_serial,
+    input  wire        rx_serial 
 );
 
-    // Internal wires connecting the Slave to the TX Core
     wire [7:0]  tx_byte;
     wire        tx_start;
     wire        tx_busy;
     wire [15:0] baud_div;
+    
+    wire [7:0]  rx_data;
+    wire        rx_done;
 
-    // Instantiate the APB Slave Controller
     apb_uart_slave u_slave (
         .pclk     (pclk),
         .presetn  (presetn),
@@ -33,10 +37,11 @@ module apb_uart_top (
         .tx_byte  (tx_byte),
         .tx_start (tx_start),
         .tx_busy  (tx_busy),
-        .baud_div (baud_div)
+        .baud_div (baud_div),
+        .rx_data  (rx_data),
+        .rx_done  (rx_done)
     );
 
-    // Instantiate the Core UART TX
     uart_tx u_tx (
         .clk       (pclk),
         .rst_n     (presetn),
@@ -45,6 +50,15 @@ module apb_uart_top (
         .tx_start  (tx_start),
         .tx_serial (tx_serial),
         .tx_busy   (tx_busy)
+    );
+
+    uart_rx u_rx (
+        .clk       (pclk),
+        .rst_n     (presetn),
+        .baud_div  (baud_div),
+        .rx_serial (rx_serial),
+        .rx_data   (rx_data),
+        .rx_done   (rx_done)
     );
 
 endmodule
