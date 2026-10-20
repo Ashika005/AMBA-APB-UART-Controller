@@ -1,0 +1,9 @@
+
+# Compiled binaries
+sim_run
+slave_check
+tx_check
+top_check
+
+# Simulation waveforms
+*.vcd
