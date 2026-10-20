@@ -4,6 +4,8 @@ sim_run
 slave_check
 tx_check
 top_check
+full_check
+rx_check
 
 # Simulation waveforms
 *.vcd
